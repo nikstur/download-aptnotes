@@ -2,10 +2,12 @@ import asyncio
 import json
 import logging
 import time
+import hashlib
+import functools
 from asyncio import BoundedSemaphore
 from queue import Queue
 from threading import Condition, Event
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Callable
 
 import aiohttp
 from aiohttp import ClientSession
@@ -32,13 +34,15 @@ async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
         print(f"Time for reformatting aptnotes.json: {step1 - start}s")
 
         # Step 2: Get source json with file urls
-        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(session, aptnotes)
+        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(
+            session, aptnotes[530:540]
+        )
         step2 = time.time()
         print(f"Time for retreiving file urls: {step2 - step1}s")
 
         # Step 3: Get files
         await fetch_and_enqueue_multiple(
-            session, queue, condition, aptnotes_with_file_urls
+            aptnotes_with_file_urls, session, condition, queue
         )
         step3 = time.time()
         print(f"Time for retrieving files: {step3 - step2}s")
@@ -112,11 +116,11 @@ def find_file_url(page: str) -> str:
 
 
 async def fetch_and_enqueue_multiple(
-    session: ClientSession, queue: Queue, condition: Condition, aptnotes: List[Dict]
+    aptnotes: List[Dict], session: ClientSession, condition: Condition, queue: Queue
 ) -> None:
     semaphore = BoundedSemaphore(50)
     coros = [
-        fetch_and_enqueue(semaphore, session, queue, condition, aptnote)
+        fetch_and_enqueue(aptnote, semaphore, session, condition, queue)
         for aptnote in aptnotes
         if not isinstance(aptnote, Exception)
     ]
@@ -124,18 +128,37 @@ async def fetch_and_enqueue_multiple(
 
 
 async def fetch_and_enqueue(
+    aptnote: Dict,
     semaphore: BoundedSemaphore,
     session: ClientSession,
-    queue: Queue,
     condition: Condition,
-    aptnote: Dict,
+    queue: Queue,
 ) -> None:
     url = aptnote["file_url"]
     buffer = await fetch(semaphore, session, url)
-    if not buffer == None:
+
+    if buffer:
+        if not check_integrity(buffer, aptnote["sha1"]):
+            logging.error(
+                f"Integrity of file from {url} could not be verified. Retrying once..."
+            )
+            buffer = await fetch(semaphore, session, url)
+            if not check_integrity(buffer, aptnote["sha1"]):
+                logging.error(
+                    f"Integrity of file from {url} could not be verified on second try. Discarding it...",
+                )
+                raise ValueError("File integrity could not be verified")
+
         with condition:
             queue.put((buffer, aptnote))
             condition.notify()
+
+
+def check_integrity(buffer: bytes, correct_hash: str) -> bool:
+    hash_check = hashlib.sha1()
+    hash_check.update(buffer)
+    result = hash_check.hexdigest() == correct_hash
+    return result
 
 
 async def fetch(
