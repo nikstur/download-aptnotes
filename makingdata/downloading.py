@@ -2,9 +2,10 @@ import asyncio
 import json
 import logging
 import time
+from asyncio import BoundedSemaphore
 from queue import Queue
 from threading import Condition, Event
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import aiohttp
 from aiohttp import ClientSession
@@ -47,7 +48,8 @@ async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
 
 
 async def get_aptnotes(session: ClientSession, url: str) -> List[Dict]:
-    data = await fetch(session, url, return_type="json")
+    semaphore = BoundedSemaphore(1)
+    data = await fetch(semaphore, session, url, return_type="json")
     aptnotes = rename_aptnotes(data)
     return aptnotes
 
@@ -74,14 +76,17 @@ def rename_aptnotes(aptnotes: Dict) -> List[Dict]:
 async def get_aptnotes_with_file_urls(
     session: ClientSession, aptnotes: Dict
 ) -> List[Dict]:
-    coros = [get_file_url(session, aptnote) for aptnote in aptnotes]
+    semaphore = BoundedSemaphore(50)
+    coros = [get_file_url(semaphore, session, aptnote) for aptnote in aptnotes]
     aptnotes_with_file_urls = await asyncio.gather(*coros, return_exceptions=True)
     return aptnotes_with_file_urls
 
 
-async def get_file_url(session: ClientSession, document: Dict) -> Dict:
+async def get_file_url(
+    semaphore: BoundedSemaphore, session: ClientSession, document: Dict
+) -> Dict:
     url = document.get("splash_url")
-    splash_page = await fetch(session, url, return_type="text")
+    splash_page = await fetch(semaphore, session, url, return_type="text")
     file_url = find_file_url(splash_page)
     document["file_url"] = file_url
     return document
@@ -109,8 +114,9 @@ def find_file_url(page: str) -> str:
 async def fetch_and_enqueue_multiple(
     session: ClientSession, queue: Queue, condition: Condition, aptnotes: List[Dict]
 ) -> None:
+    semaphore = BoundedSemaphore(50)
     coros = [
-        fetch_and_enqueue(session, queue, condition, aptnote)
+        fetch_and_enqueue(semaphore, session, queue, condition, aptnote)
         for aptnote in aptnotes
         if not isinstance(aptnote, Exception)
     ]
@@ -118,26 +124,36 @@ async def fetch_and_enqueue_multiple(
 
 
 async def fetch_and_enqueue(
-    session: ClientSession, queue: Queue, condition: Condition, aptnote: Dict
+    semaphore: BoundedSemaphore,
+    session: ClientSession,
+    queue: Queue,
+    condition: Condition,
+    aptnote: Dict,
 ) -> None:
     url = aptnote["file_url"]
-    buffer = await fetch(session, url)
+    buffer = await fetch(semaphore, session, url)
     if not buffer == None:
         with condition:
             queue.put((buffer, aptnote))
             condition.notify()
 
 
-async def fetch(session: ClientSession, url: str, return_type: str = "bytes") -> None:
+async def fetch(
+    semaphore: BoundedSemaphore,
+    session: ClientSession,
+    url: str,
+    return_type: str = "bytes",
+) -> Union[bytes, Dict, str]:
     try:
-        async with session.get(url) as response:
-            if response.status == 200:
-                if return_type == "bytes":
-                    data = await response.read()
-                elif return_type == "json":
-                    data = await response.json(content_type=None)
-                elif return_type == "text":
-                    data = await response.text()
-                return data
+        async with semaphore:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    if return_type == "bytes":
+                        data = await response.read()
+                    elif return_type == "json":
+                        data = await response.json(content_type=None)
+                    elif return_type == "text":
+                        data = await response.text()
+                    return data
     except InvalidURL as e:
         logging.error("Error in fetch", exc_info=e)
