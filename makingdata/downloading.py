@@ -1,13 +1,13 @@
 import asyncio
+import functools
+import hashlib
 import json
 import logging
 import time
-import hashlib
-import functools
 from asyncio import BoundedSemaphore
 from queue import Queue
 from threading import Condition, Event
-from typing import Dict, List, Union, Callable
+from typing import Callable, Dict, List, Union
 
 import aiohttp
 from aiohttp import ClientSession
@@ -15,9 +15,11 @@ from aiohttp.client_exceptions import InvalidURL
 from bs4 import BeautifulSoup
 
 
-def download(queue: Queue, condition: Condition, finished_event: Event) -> None:
+def download(
+    queue: Queue, condition: Condition, finished_download_event: Event
+) -> None:
     asyncio.run(download_and_enqueue(queue, condition))
-    finished_event.set()
+    finished_download_event.set()
 
 
 async def download_and_enqueue(queue: Queue, condition: Condition) -> None:

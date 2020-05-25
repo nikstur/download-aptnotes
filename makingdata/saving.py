@@ -1,18 +1,56 @@
+import asyncio
 import logging
 import sqlite3
+from pathlib import Path
 from queue import Queue
 from sqlite3 import Cursor
 from threading import Condition, Event
 
+import aiofiles
 
-def save(queue: Queue, condition: Condition, finished_event: Event) -> None:
-    connection = sqlite3.connect("aptnotes.sqlite")
+
+def save_to_files(
+    queue: Queue, condition: Condition, finished_download_event: Event, base_path: Path
+) -> None:
+    asyncio.run(
+        save_and_write_to_files(queue, condition, finished_download_event, base_path)
+    )
+
+
+async def save_and_write_to_files(
+    queue: Queue, condition: Condition, finished_download_event: Event, base_path: Path,
+) -> None:
+    while not finished_download_event.is_set() or not queue.empty():
+        with condition:
+            while queue.empty():
+                condition.wait()
+            try:
+                buffer, aptnote = queue.get()
+                logging.debug("Retrieved item from saving queue")
+            finally:
+                queue.task_done()
+
+        filename = aptnote.get("filename")
+        path = base_path / filename
+        path = path.with_suffix(".pdf")
+        await write_file(buffer, path)
+
+
+async def write_file(buffer: bytes, path: Path) -> None:
+    async with aiofiles.open(path, mode="wb") as f:
+        await f.write(buffer)
+
+
+def save_to_db(
+    queue: Queue, condition: Condition, finished_download_event: Event, path: Path
+) -> None:
+    connection = sqlite3.connect(path)
     cursor = connection.cursor()
 
     setup_db(cursor, drop=True)
     connection.commit()
 
-    while not finished_event.is_set() or not queue.empty():
+    while not finished_download_event.is_set() or not queue.empty():
         with condition:
             while queue.empty():
                 condition.wait()

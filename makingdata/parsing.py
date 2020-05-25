@@ -12,9 +12,9 @@ def parse(
     consumer_condition: Condition,
     producer_queue: Queue,
     producer_condition: Condition,
-    finished_event: Event,
+    finished_download_event: Event,
 ) -> None:
-    while not finished_event.is_set() or not consumer_queue.empty():
+    while not finished_download_event.is_set() or not consumer_queue.empty():
         with consumer_condition:
             while consumer_queue.empty():
                 consumer_condition.wait()
