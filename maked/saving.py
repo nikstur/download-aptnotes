@@ -7,7 +7,7 @@ from sqlite3 import Cursor
 from threading import Condition, Event
 from typing import Union, List, Dict
 
-import aiofiles
+import aiofiles  # type: ignore
 
 
 def save_to_files(

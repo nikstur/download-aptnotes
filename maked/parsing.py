@@ -4,7 +4,7 @@ from queue import Queue
 from threading import Condition, Event
 from typing import Dict
 
-from tika import parser
+from tika import parser  # type: ignore
 
 
 def parse(

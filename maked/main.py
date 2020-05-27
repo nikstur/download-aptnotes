@@ -3,6 +3,7 @@ import threading
 import time
 from pathlib import Path
 from queue import Queue
+from typing import List, Tuple, Dict
 
 import typer
 
@@ -33,11 +34,11 @@ def sqlite(path: Path):
 
 class DataMaker:
     def __init__(self) -> None:
-        self.threads = []
+        self.threads: List[threading.Thread] = []
         self._add_downloading()
 
     def _add_downloading(self) -> None:
-        self.buffer_queue = Queue()
+        self.buffer_queue: "Queue[Tuple[bytes, Dict]]" = Queue()
         self.buffer_queue_condition = threading.Condition()
         self.finished_download_event = threading.Event()
 
@@ -67,7 +68,7 @@ class DataMaker:
         )
 
     def _add_parsing(self) -> None:
-        self.parsed_doc_queue = Queue()
+        self.parsed_doc_queue: "Queue[Tuple[Dict, Dict]]" = Queue()
         self.parsed_doc_queue_condition = threading.Condition()
         self.threads.append(
             threading.Thread(

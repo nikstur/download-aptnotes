@@ -9,9 +9,9 @@ from threading import Condition, Event
 from typing import Callable, Dict, List, Union
 
 import aiohttp
-from aiohttp import ClientSession
-from aiohttp.client_exceptions import InvalidURL
-from bs4 import BeautifulSoup
+from aiohttp import ClientSession, ClientResponse
+from aiohttp.web import HTTPException
+from bs4 import BeautifulSoup  # type: ignore
 
 
 def download(
@@ -35,7 +35,9 @@ async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
         print(f"Time for reformatting aptnotes.json: {step1 - start}s")
 
         # Step 2: Get source json with file urls
-        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(session, aptnotes)
+        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(
+            session, aptnotes[1:5]
+        )
         step2 = time.time()
         print(f"Time for retreiving file urls: {step2 - step1}s")
 
@@ -57,7 +59,7 @@ async def get_aptnotes(session: ClientSession, url: str) -> List[Dict]:
     return aptnotes
 
 
-def rename_aptnotes(aptnotes: Dict) -> List[Dict]:
+def rename_aptnotes(aptnotes: List[Dict]) -> List[Dict]:
     renamed_aptnotes = []
     for count, doc in enumerate(aptnotes):
         doc = {
@@ -77,7 +79,7 @@ def rename_aptnotes(aptnotes: Dict) -> List[Dict]:
 
 
 async def get_aptnotes_with_file_urls(
-    session: ClientSession, aptnotes: Dict
+    session: ClientSession, aptnotes: List[Dict]
 ) -> List[Dict]:
     semaphore = BoundedSemaphore(50)
     coros = [get_file_url(semaphore, session, aptnote) for aptnote in aptnotes]
@@ -88,7 +90,7 @@ async def get_aptnotes_with_file_urls(
 async def get_file_url(
     semaphore: BoundedSemaphore, session: ClientSession, document: Dict
 ) -> Dict:
-    url = document.get("splash_url")
+    url = document.get("splash_url", "")
     splash_page = await fetch(semaphore, session, url, return_type="text")
     file_url = find_file_url(splash_page)
     document["file_url"] = file_url
@@ -165,17 +167,15 @@ async def fetch(
     session: ClientSession,
     url: str,
     return_type: str = "bytes",
-) -> Union[bytes, Dict, str]:
-    try:
-        async with semaphore:
-            async with session.get(url) as response:
-                if response.status == 200:
-                    if return_type == "bytes":
-                        data = await response.read()
-                    elif return_type == "json":
-                        data = await response.json(content_type=None)
-                    elif return_type == "text":
-                        data = await response.text()
-                    return data
-    except InvalidURL as e:
-        logging.error("Error in fetch", exc_info=e)
+) -> Union[bytes, List[Dict], str]:
+    async with semaphore:
+        async with session.get(url) as response:
+            if response.status == 200:
+                if return_type == "bytes":
+                    return await response.read()
+                elif return_type == "json":
+                    return await response.json(content_type=None)
+                elif return_type == "text":
+                    return await response.text()
+            else:
+                raise HTTPException(text=f"Response status: {response.status}")
