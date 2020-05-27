@@ -1,5 +1,4 @@
 import asyncio
-import functools
 import hashlib
 import json
 import logging
