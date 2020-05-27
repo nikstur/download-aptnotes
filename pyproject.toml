@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "project"
+name = "aptnotes-institutions"
 version = "0.1.0"
 description = ""
 authors = ["Niklas Sturm"]
@@ -22,6 +22,9 @@ black = "^19.10b0"
 ipykernel = "^5.2.1"
 bandit = "^1.6.2"
 mypy = "^0.770"
+
+[tool.poetry.scripts]
+maked = "maked.main:app"
 
 [build-system]
 requires = ["poetry>=0.12"]

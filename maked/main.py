@@ -6,7 +6,7 @@ from queue import Queue
 
 import typer
 
-from makingdata import downloading, parsing, saving
+from . import downloading, parsing, saving
 
 logging.basicConfig(
     filename="makedata.log",
