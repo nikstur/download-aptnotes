@@ -11,11 +11,11 @@ Additionally, you need to have [Apache Tika](https://tika.apache.org/) installed
 To make the data use the `maked` command line tool. To download the PDFs to the directory `data/`:
 
 ````bash
-poetry run python -m maked/main.py files data
+poetry run python -m maked.main files data
 ````
 
 To download the documents, parse them, and then store them in a SQLite called `aptnotes.sqlite` database this command is used:
 
 ````bash
-poetry run python -m maked/main.py sqlite aptnotes.sqlite
+poetry run python -m maked.main sqlite aptnotes.sqlite
 ````
