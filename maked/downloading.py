@@ -36,9 +36,7 @@ async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
         print(f"Time for reformatting aptnotes.json: {step1 - start}s")
 
         # Step 2: Get source json with file urls
-        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(
-            session, aptnotes[1:50]
-        )
+        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(session, aptnotes)
         step2 = time.time()
         print(f"Time for retreiving file urls: {step2 - step1}s")
 
