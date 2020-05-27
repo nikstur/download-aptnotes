@@ -12,6 +12,8 @@ import aiofiles
 def save_to_files(
     queue: Queue, condition: Condition, finished_download_event: Event, base_path: Path
 ) -> None:
+    base_path.mkdir(parents=True, exist_ok=True)
+
     asyncio.run(
         save_and_write_to_files(queue, condition, finished_download_event, base_path)
     )
