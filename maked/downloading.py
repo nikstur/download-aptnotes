@@ -6,7 +6,7 @@ import time
 from asyncio import BoundedSemaphore
 from queue import Queue
 from threading import Condition, Event
-from typing import Callable, Dict, List, Union
+from typing import Callable, Dict, List, Any
 
 import aiohttp
 from aiohttp import ClientSession, ClientResponse
@@ -167,7 +167,7 @@ async def fetch(
     session: ClientSession,
     url: str,
     return_type: str = "bytes",
-) -> Union[bytes, List[Dict], str]:
+) -> Any:
     async with semaphore:
         async with session.get(url) as response:
             if response.status == 200:
