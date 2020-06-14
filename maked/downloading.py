@@ -6,10 +6,10 @@ import time
 from asyncio import BoundedSemaphore
 from queue import Queue
 from threading import Condition, Event
-from typing import Callable, Dict, List, Any
+from typing import Any, Dict, List
 
 import aiohttp
-from aiohttp import ClientSession, ClientResponse
+from aiohttp import ClientSession
 from aiohttp.web import HTTPException
 from bs4 import BeautifulSoup  # type: ignore
 
@@ -35,9 +35,7 @@ async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
         print(f"Time for reformatting aptnotes.json: {step1 - start}s")
 
         # Step 2: Get source json with file urls
-        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(
-            session, aptnotes[1:5]
-        )
+        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(session, aptnotes)
         step2 = time.time()
         print(f"Time for retreiving file urls: {step2 - step1}s")
 

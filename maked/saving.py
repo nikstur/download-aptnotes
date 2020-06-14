@@ -5,7 +5,7 @@ from pathlib import Path
 from queue import Queue
 from sqlite3 import Cursor
 from threading import Condition, Event
-from typing import Union, List, Dict
+from typing import Dict, List, Union
 
 import aiofiles  # type: ignore
 
@@ -75,7 +75,7 @@ def save_to_db(
 
 def setup_db(cursor: Cursor, drop: bool = False) -> None:
     """Check whether necessary tables are present, create them otherwise.
-    
+
     When drop=True, drop all tables and recreate them.
     """
     is_there_aptnotes = check_table(cursor, "aptnotes")
@@ -89,17 +89,17 @@ def setup_db(cursor: Cursor, drop: bool = False) -> None:
         create_authors_tables(cursor)
     else:
         if is_there_aptnotes:
-            if drop == True:
+            if drop:
                 logging.debug("Dropping aptnotes table...")
                 cursor.execute("DROP TABLE aptnotes")
                 create_aptnotes_table(cursor)
         if is_there_documents:
-            if drop == True:
+            if drop:
                 logging.debug("Dropping documents table...")
                 cursor.execute("DROP TABLE documents")
                 create_documents_table(cursor)
         if is_there_authors:
-            if drop == True:
+            if drop:
                 logging.debug("Dropping authors table...")
                 cursor.execute("DROP TABLE authors")
                 create_authors_tables(cursor)
