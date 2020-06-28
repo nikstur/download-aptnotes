@@ -16,7 +16,6 @@ typer = "^0.2.1"
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 black = "^19.10b0"
-ipykernel = "^5.2.1"
 bandit = "^1.6.2"
 mypy = "^0.770"
 flake8 = "^3.8.2"
@@ -24,6 +23,12 @@ isort = "^4.3.21"
 
 [tool.poetry.scripts]
 maked = "maked.main:app"
+
+[tool.isort]
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+use_parentheses = true
 
 [build-system]
 requires = ["poetry>=0.12"]
