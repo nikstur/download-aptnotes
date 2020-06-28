@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "aptnotes-download"
+name = "maked"
 version = "0.1.0"
-description = "Simple CLI to download aptnotes as pdfs or parse and store them in an SQLite DB."
-authors = ["Niklas Sturm"]
+description = "Simple CLI to download aptnotes as pdfs or to parse and store them in an SQLite DB."
+authors = ["nikstur"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
