@@ -1,29 +1,33 @@
-import concurrent.futures
 import logging
 from queue import Queue
 from threading import Condition, Event
 from typing import Dict
 
-from tika import parser  # type: ignore
+from tika import parser
 
 
 def parse(
-    consumer_queue: Queue,
-    consumer_condition: Condition,
-    producer_queue: Queue,
-    producer_condition: Condition,
-    finished_download_event: Event,
+    input_queue: Queue,
+    input_queue_condition: Condition,
+    input_finish_event: Event,
+    output_queue: Queue,
+    output_queue_condition: Condition,
+    output_finish_event: Event,
 ) -> None:
-    while not finished_download_event.is_set() or not consumer_queue.empty():
-        with consumer_condition:
-            while consumer_queue.empty():
-                consumer_condition.wait()
+    retrieved_items = 0
+    while not input_finish_event.is_set() or not input_queue.empty():
+        with input_queue_condition:
+            while input_queue.empty():
+                input_queue_condition.wait()
             try:
-                buffer, aptnote = consumer_queue.get()
-                logging.debug("Retrieved item from parsing queue")
+                buffer, aptnote = input_queue.get()
+                logging.debug("Retrieved item from buffer queue")
+                retrieved_items += 1
             finally:
-                consumer_queue.task_done()
-        parse_and_enqueue(buffer, aptnote, producer_queue, producer_condition)
+                input_queue.task_done()
+        parse_and_enqueue(buffer, aptnote, output_queue, output_queue_condition)
+    output_finish_event.set()
+    logging.info(f"No. of retrieved items from buffer queue: {retrieved_items}")
 
 
 def parse_and_enqueue(
@@ -35,7 +39,7 @@ def parse_and_enqueue(
     document = assemble_document(unique_id, parsed_buffer)
     with condition:
         queue.put((aptnote, document))
-        logging.debug("Enqueued document with parsed buffer")
+        logging.debug("Enqueued parsed buffer into parsed doc queue")
         condition.notify()
 
 
@@ -46,7 +50,6 @@ def assemble_document(unique_id: int, parsed_buffer: Dict) -> Dict:
     document = {
         "unique_id": unique_id,
         "fulltext": content,
-        "author": metadata.get("Author"),
         "creation_date": metadata.get("Creation-Date"),
         "creator_tool": metadata.get("pdf:docinfo:creator_tool"),
         "creator_title": metadata.get("pdf:docinfo:title"),

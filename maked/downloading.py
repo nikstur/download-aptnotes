@@ -11,20 +11,25 @@ from typing import Any, Dict, List
 import aiohttp
 from aiohttp import ClientSession
 from aiohttp.web import HTTPException
-from bs4 import BeautifulSoup  # type: ignore
+from bs4 import BeautifulSoup
 
 
 def download(
-    queue: Queue, condition: Condition, finished_download_event: Event
+    queue: Queue, condition: Condition, finish_event: Event, limit: int
 ) -> None:
-    asyncio.run(download_and_enqueue(queue, condition))
-    finished_download_event.set()
+    asyncio.run(download_and_enqueue(queue, condition, limit))
+    finish_event.set()
 
 
-async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
+async def download_and_enqueue(queue: Queue, condition: Condition, limit: int) -> None:
     source_json_url = (
         "https://raw.githubusercontent.com/aptnotes/data/master/APTnotes.json"
     )
+
+    if limit == 0:
+        limit_slice = slice(None)
+    else:
+        limit_slice = slice(limit)
 
     async with aiohttp.ClientSession() as session:
         start = time.time()
@@ -32,19 +37,25 @@ async def download_and_enqueue(queue: Queue, condition: Condition) -> None:
         # Step 1: Get source json
         aptnotes = await get_aptnotes(session, source_json_url)
         step1 = time.time()
-        print(f"Time for reformatting aptnotes.json: {step1 - start}s")
+        logging.info(f"Time for reformatting aptnotes.json: {step1 - start}s")
+        logging.info(f"Length of aptnotes: {len(aptnotes)}")
 
         # Step 2: Get source json with file urls
-        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(session, aptnotes)
+        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(
+            session, aptnotes[limit_slice]
+        )
         step2 = time.time()
-        print(f"Time for retreiving file urls: {step2 - step1}s")
+        logging.info(f"Time for retreiving file urls: {step2 - step1}s")
+        logging.info(
+            f"Length of aptnotes_with_file_urls: {len(aptnotes_with_file_urls)}"
+        )
 
         # Step 3: Get files
         await fetch_and_enqueue_multiple(
             aptnotes_with_file_urls, session, condition, queue
         )
         step3 = time.time()
-        print(f"Time for retrieving files: {step3 - step2}s")
+        logging.info(f"Time for retrieving files: {step3 - step2}s.")
 
 
 # Step 1: Get source json
@@ -90,8 +101,7 @@ async def get_file_url(
 ) -> Dict:
     url = document.get("splash_url", "")
     splash_page = await fetch(semaphore, session, url, return_type="text")
-    file_url = find_file_url(splash_page)
-    document["file_url"] = file_url
+    document["file_url"] = find_file_url(splash_page)
     return document
 
 
@@ -101,13 +111,27 @@ def find_file_url(page: str) -> str:
     scripts = soup.find("body").find_all("script")
     sections = scripts[-1].contents[0].split(";")
     app_api = json.loads(sections[0].split("=")[1])["/app-api/enduserapp/shared-item"]
+    file_url = build_file_url(app_api["sharedName"], app_api["itemID"])
+    return file_url
 
-    # Build download URL
-    box_url = "https://app.box.com/index.php"
-    box_args = "?rm=box_download_shared_file&shared_name={}&file_id={}"
-    file_url = box_url + box_args.format(
-        app_api["sharedName"], "f_{}".format(app_api["itemID"])
-    )
+
+# def build_download_url(app_api: Dict) -> str:
+#     box_url = "https://app.box.com/index.php"
+#     box_args = "?rm=box_download_shared_file&shared_name={}&file_id={}"
+#     file_url = box_url + box_args.format(
+#         app_api["sharedName"], "f_{}".format(app_api["itemID"])
+#     )
+#     return file_url
+
+
+def build_file_url(shared_name: str, item_id: str) -> str:
+    url = "https://app.box.com/index.php"
+    parameters = [
+        "?rm=box_download_shared_file",
+        f"&shared_name={shared_name}",
+        f"&file_id=f_{item_id}",
+    ]
+    file_url = url + "".join(parameters)
     return file_url
 
 
@@ -176,4 +200,5 @@ async def fetch(
                 elif return_type == "text":
                     return await response.text()
             else:
-                raise HTTPException(text=f"Response status: {response.status}")
+                exception_text = f"Response status: {response.status}"
+                raise HTTPException(text=exception_text)
