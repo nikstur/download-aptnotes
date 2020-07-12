@@ -115,15 +115,6 @@ def find_file_url(page: str) -> str:
     return file_url
 
 
-# def build_download_url(app_api: Dict) -> str:
-#     box_url = "https://app.box.com/index.php"
-#     box_args = "?rm=box_download_shared_file&shared_name={}&file_id={}"
-#     file_url = box_url + box_args.format(
-#         app_api["sharedName"], "f_{}".format(app_api["itemID"])
-#     )
-#     return file_url
-
-
 def build_file_url(shared_name: str, item_id: str) -> str:
     url = "https://app.box.com/index.php"
     parameters = [
