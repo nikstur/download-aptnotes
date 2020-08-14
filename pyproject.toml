@@ -1,28 +1,27 @@
 [tool.poetry]
-name = "maked"
+name = "aptnotes-download"
 version = "0.1.0"
-description = "Simple CLI to download aptnotes as pdfs or to parse and store them in an SQLite DB."
+description = "Simple CLI to download and/or parse aptnotes."
 authors = ["nikstur"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
 aiofiles = "^0.5.0"
 aiohttp = "^3.6.2"
-beautifulsoup4 = "^4.9.1"
-lxml = "^4.5.0"
+beautifulsoup4 = {extras = ["lxml"], version = "^4.9.1"}
 tika = "^1.24"
-typer = "^0.2.1"
+typer = "^0.3.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 black = "^19.10b0"
 bandit = "^1.6.2"
-mypy = "^0.770"
-flake8 = "^3.8.2"
-isort = "^4.3.21"
+mypy = "^0.782"
+flake8 = "^3.8.3"
+isort = "^5.4.1"
 
 [tool.poetry.scripts]
-maked = "maked.main:app"
+aptnotes-download = "aptnotes_download.main:app"
 
 [tool.isort]
 line_length = 88
