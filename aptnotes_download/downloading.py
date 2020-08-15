@@ -6,32 +6,30 @@ import time
 from asyncio import BoundedSemaphore
 from queue import Queue
 from threading import Condition, Event
-from typing import Any, Dict, List
+from typing import Coroutine, List, Literal, Optional, Union, overload
 
 import aiohttp
 from aiohttp import ClientSession
-from aiohttp.web import HTTPException
 from bs4 import BeautifulSoup
 
 
 def download(
-    queue: Queue, condition: Condition, finish_event: Event, limit: int
+    queue: Queue, condition: Condition, finish_event: Event, limit: Optional[int]
 ) -> None:
     asyncio.run(download_and_enqueue(queue, condition, limit))
     finish_event.set()
 
 
-async def download_and_enqueue(queue: Queue, condition: Condition, limit: int) -> None:
+async def download_and_enqueue(
+    queue: Queue, condition: Condition, limit: Optional[int]
+) -> None:
     source_json_url = (
         "https://raw.githubusercontent.com/aptnotes/data/master/APTnotes.json"
     )
 
-    if limit == 0:
-        limit_slice = slice(None)
-    else:
-        limit_slice = slice(limit)
+    limit_slice: slice = slice(limit)
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers={"Connection": "keep-alive"}) as session:
         start = time.time()
 
         # Step 1: Get source json
@@ -61,15 +59,15 @@ async def download_and_enqueue(queue: Queue, condition: Condition, limit: int) -
 # Step 1: Get source json
 
 
-async def get_aptnotes(session: ClientSession, url: str) -> List[Dict]:
-    semaphore = BoundedSemaphore(1)
-    data = await fetch(semaphore, session, url, return_type="json")
-    aptnotes = rename_aptnotes(data)
+async def get_aptnotes(session: ClientSession, url: str) -> List[dict]:
+    semaphore: BoundedSemaphore = BoundedSemaphore(1)
+    data: List[dict] = await fetch(semaphore, session, url, return_type="json")
+    aptnotes: List[dict] = rename_aptnotes(data)
     return aptnotes
 
 
-def rename_aptnotes(aptnotes: List[Dict]) -> List[Dict]:
-    renamed_aptnotes = []
+def rename_aptnotes(aptnotes: List[dict]) -> List[dict]:
+    renamed_aptnotes: List[dict] = []
     for count, doc in enumerate(aptnotes):
         doc = {
             "unique_id": count,
@@ -88,19 +86,23 @@ def rename_aptnotes(aptnotes: List[Dict]) -> List[Dict]:
 
 
 async def get_aptnotes_with_file_urls(
-    session: ClientSession, aptnotes: List[Dict]
-) -> List[Dict]:
-    semaphore = BoundedSemaphore(50)
-    coros = [get_file_url(semaphore, session, aptnote) for aptnote in aptnotes]
-    aptnotes_with_file_urls = await asyncio.gather(*coros, return_exceptions=True)
+    session: ClientSession, aptnotes: List[dict]
+) -> List[dict]:
+    semaphore: BoundedSemaphore = BoundedSemaphore(25)
+    coros: List[Coroutine] = [
+        get_file_url(semaphore, session, aptnote) for aptnote in aptnotes
+    ]
+    aptnotes_with_file_urls: List[dict] = await asyncio.gather(
+        *coros, return_exceptions=True
+    )
     return aptnotes_with_file_urls
 
 
 async def get_file_url(
-    semaphore: BoundedSemaphore, session: ClientSession, document: Dict
-) -> Dict:
-    url = document.get("splash_url", "")
-    splash_page = await fetch(semaphore, session, url, return_type="text")
+    semaphore: BoundedSemaphore, session: ClientSession, document: dict
+) -> dict:
+    url: str = document.get("splash_url", "")
+    splash_page: str = await fetch(semaphore, session, url, return_type="text")
     document["file_url"] = find_file_url(splash_page)
     return document
 
@@ -109,20 +111,22 @@ def find_file_url(page: str) -> str:
     """Parse preview page for desired elements to build download URL"""
     soup = BeautifulSoup(page, "lxml")
     scripts = soup.find("body").find_all("script")
-    sections = scripts[-1].contents[0].split(";")
-    app_api = json.loads(sections[0].split("=")[1])["/app-api/enduserapp/shared-item"]
-    file_url = build_file_url(app_api["sharedName"], app_api["itemID"])
+    sections: List[str] = scripts[-1].contents[0].split(";")
+    app_api: dict = json.loads(sections[0].split("=")[1])[
+        "/app-api/enduserapp/shared-item"
+    ]
+    file_url: str = build_file_url(app_api["sharedName"], app_api["itemID"])
     return file_url
 
 
 def build_file_url(shared_name: str, item_id: str) -> str:
-    url = "https://app.box.com/index.php"
-    parameters = [
+    url: str = "https://app.box.com/index.php"
+    parameters: List[str] = [
         "?rm=box_download_shared_file",
         f"&shared_name={shared_name}",
         f"&file_id=f_{item_id}",
     ]
-    file_url = url + "".join(parameters)
+    file_url: str = url + "".join(parameters)
     return file_url
 
 
@@ -130,26 +134,26 @@ def build_file_url(shared_name: str, item_id: str) -> str:
 
 
 async def fetch_and_enqueue_multiple(
-    aptnotes: List[Dict], session: ClientSession, condition: Condition, queue: Queue
+    aptnotes: List[dict], session: ClientSession, condition: Condition, queue: Queue
 ) -> None:
-    semaphore = BoundedSemaphore(50)
-    coros = [
+    semaphore: BoundedSemaphore = BoundedSemaphore(25)
+    coros: List[Coroutine] = [
         fetch_and_enqueue(aptnote, semaphore, session, condition, queue)
         for aptnote in aptnotes
         if not isinstance(aptnote, Exception)
     ]
-    await asyncio.gather(*coros)
+    await asyncio.gather(*coros, return_exceptions=True)
 
 
 async def fetch_and_enqueue(
-    aptnote: Dict,
+    aptnote: dict,
     semaphore: BoundedSemaphore,
     session: ClientSession,
     condition: Condition,
     queue: Queue,
 ) -> None:
     url = aptnote["file_url"]
-    buffer = await fetch(semaphore, session, url)
+    buffer: bytes = await fetch(semaphore, session, url)
 
     if buffer:
         if not check_integrity(buffer, aptnote["sha1"]):
@@ -171,16 +175,46 @@ async def fetch_and_enqueue(
 def check_integrity(buffer: bytes, correct_hash: str) -> bool:
     hash_check = hashlib.sha1()
     hash_check.update(buffer)
-    result = hash_check.hexdigest() == correct_hash
+    result: bool = hash_check.hexdigest() == correct_hash
     return result
+
+
+@overload
+async def fetch(
+    semaphore: BoundedSemaphore,
+    session: ClientSession,
+    url: str,
+    return_type: Literal["bytes"] = "bytes",
+) -> bytes:
+    ...
+
+
+@overload
+async def fetch(
+    semaphore: BoundedSemaphore,
+    session: ClientSession,
+    url: str,
+    return_type: Literal["json"],
+) -> List[dict]:
+    ...
+
+
+@overload
+async def fetch(
+    semaphore: BoundedSemaphore,
+    session: ClientSession,
+    url: str,
+    return_type: Literal["text"],
+) -> str:
+    ...
 
 
 async def fetch(
     semaphore: BoundedSemaphore,
     session: ClientSession,
     url: str,
-    return_type: str = "bytes",
-) -> Any:
+    return_type: Literal["bytes", "json", "text"] = "bytes",
+) -> Union[bytes, List[dict], str]:
     async with semaphore:
         async with session.get(url) as response:
             if response.status == 200:
@@ -191,5 +225,6 @@ async def fetch(
                 elif return_type == "text":
                     return await response.text()
             else:
-                exception_text = f"Response status: {response.status}"
-                raise HTTPException(text=exception_text)
+                raise Exception(
+                    f"Unsuccessful request for {url}. Reponse status: {response.status}"
+                )

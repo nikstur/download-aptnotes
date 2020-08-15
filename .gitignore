@@ -1,5 +1,5 @@
 .vscode/
-data/
+files/
 *.sqlite
 test.*
 debug.*
