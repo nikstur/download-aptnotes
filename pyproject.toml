@@ -17,12 +17,12 @@ tika = "^1.24"
 typer = {extras = ["all"], version = "^0.3.1"}
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.2"
 black = "^19.10b0"
 bandit = "^1.6.2"
 mypy = "^0.782"
 flake8 = "^3.8.3"
 isort = "^5.4.1"
+pytest = "^6.0.1"
 
 [tool.isort]
 line_length = 88
