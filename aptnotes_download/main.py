@@ -117,7 +117,7 @@ class DataMaker:
         for thread in self.threads:
             thread.start()
         self._join_all()
-        print(f"Total time: {time.time() - start_time}s")
+        print(f"Total time: {round(time.time() - start_time, 1)}s")
 
     def _join_all(self):
         for thread in self.threads:
