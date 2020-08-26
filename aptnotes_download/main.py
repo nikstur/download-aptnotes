@@ -30,6 +30,7 @@ def main(
         None, "--limit", "-l", help="Limit the number of downloads"
     ),
 ):
+    """Entry point to CLI"""
     datamaker = DataMaker(limit)
     if "sqlite" in form:
         path = ensure_correct_path(path)
@@ -41,6 +42,7 @@ def main(
 
 
 def ensure_correct_path(path: Path) -> Path:
+    """Ensure that relative and absolute paths are treating accordingly"""
     if path.is_absolute():
         return path
     else:
@@ -53,6 +55,7 @@ class DataMaker:
         self._add_downloading(limit)
 
     def _add_downloading(self, limit: Optional[int]) -> None:
+        """Add downloading thread"""
         self.buffer_queue: "Queue[Tuple[bytes, Dict]]" = Queue()
         self.buffer_queue_condition = threading.Condition()
         self.finished_download_event = threading.Event()
@@ -69,6 +72,7 @@ class DataMaker:
         self.threads.append(downloading_thread)
 
     def add_saving_to_db(self, path: Path) -> None:
+        """Add saving thread"""
         self._add_parsing()
 
         saving_to_db_thread = threading.Thread(
@@ -83,6 +87,7 @@ class DataMaker:
         self.threads.append(saving_to_db_thread)
 
     def _add_parsing(self) -> None:
+        """Add parsing thread"""
         self.parsed_doc_queue: "Queue[Tuple[Dict, Dict]]" = Queue()
         self.parsed_doc_queue_condition = threading.Condition()
         self.finished_parsing_event = threading.Event()
@@ -101,6 +106,7 @@ class DataMaker:
         self.threads.append(parsing_thread)
 
     def add_saving_to_files(self, base_path: Path) -> None:
+        """Add saving to files thread"""
         saving_to_files_thread = threading.Thread(
             target=saving.save_to_files,
             args=(
@@ -113,6 +119,7 @@ class DataMaker:
         self.threads.append(saving_to_files_thread)
 
     def start(self) -> None:
+        """Start all threads and join them after they have finished"""
         start_time = time.time()
         for thread in self.threads:
             thread.start()

@@ -12,6 +12,7 @@ def parse(
     output_queue_condition: Condition,
     output_finish_event: Event,
 ) -> None:
+    """Continually parse buffer from queue and enqueue it in second queue"""
     while not input_finish_event.is_set() or not input_queue.empty():
         with input_queue_condition:
             while input_queue.empty():
@@ -27,6 +28,7 @@ def parse(
 def parse_and_enqueue(
     buffer: bytes, aptnote: dict, queue: Queue, condition: Condition
 ) -> None:
+    """Parse and enqueue single buffer"""
     parsed_buffer: dict = parser.from_buffer(buffer)
     augmented_aptnote: dict = augment_aptnote(aptnote, parsed_buffer)
     with condition:
@@ -35,6 +37,7 @@ def parse_and_enqueue(
 
 
 def augment_aptnote(aptnote: dict, parsed_buffer: dict) -> dict:
+    """Augment single aptnote by adding metadata"""
     content: str = parsed_buffer["content"]
     metadata: dict = parsed_buffer["metadata"]
     aptnote.update(

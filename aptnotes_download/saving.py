@@ -12,6 +12,7 @@ import aiofiles
 def save_to_files(
     queue: Queue, condition: Condition, finish_event: Event, directory: Path
 ) -> None:
+    """Run save_and_write_to_files from CLI"""
     directory.mkdir(parents=True, exist_ok=True)
     asyncio.run(save_and_write_to_files(queue, condition, finish_event, directory))
 
@@ -19,6 +20,7 @@ def save_to_files(
 async def save_and_write_to_files(
     queue: Queue, condition: Condition, finish_event: Event, directory: Path,
 ) -> None:
+    """Continually read buffer from queue and write to file"""
     while not finish_event.is_set() or not queue.empty():
         with condition:
             while queue.empty():
@@ -32,6 +34,7 @@ async def save_and_write_to_files(
 
 
 async def write_file(buffer: bytes, directory: Path, filename: str) -> None:
+    """Write single file to directory / filename"""
     path = directory / filename
     path = path.with_suffix(".pdf")
     async with aiofiles.open(path, mode="wb") as f:
@@ -41,6 +44,7 @@ async def write_file(buffer: bytes, directory: Path, filename: str) -> None:
 def save_to_db(
     queue: Queue, condition: Condition, finish_event: Event, path: Path
 ) -> None:
+    """Continaully read aptnote from queue and store it in DB"""
     connection, cursor = setup_db_connection(path)
 
     inserted_values = 0

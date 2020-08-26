@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 def download(
     queue: Queue, condition: Condition, finish_event: Event, limit: Optional[int]
 ) -> None:
+    """Run download_and_enqueue from CLI"""
     asyncio.run(download_and_enqueue(queue, condition, limit))
     finish_event.set()
 
@@ -23,6 +24,7 @@ def download(
 async def download_and_enqueue(
     queue: Queue, condition: Condition, limit: Optional[int]
 ) -> None:
+    """Download and enqueue all documents from source json"""
     source_json_url = (
         "https://raw.githubusercontent.com/aptnotes/data/master/APTnotes.json"
     )
@@ -60,6 +62,7 @@ async def download_and_enqueue(
 
 
 async def get_aptnotes(session: ClientSession, url: str) -> List[dict]:
+    """Download aptnotes source json"""
     semaphore: BoundedSemaphore = BoundedSemaphore(1)
     data: List[dict] = await fetch(semaphore, session, url, return_type="json")
     aptnotes: List[dict] = rename_aptnotes(data)
@@ -67,6 +70,7 @@ async def get_aptnotes(session: ClientSession, url: str) -> List[dict]:
 
 
 def rename_aptnotes(aptnotes: List[dict]) -> List[dict]:
+    """Rename keys in aptnote and add unique id"""
     renamed_aptnotes: List[dict] = []
     for count, doc in enumerate(aptnotes):
         doc = {
@@ -88,6 +92,7 @@ def rename_aptnotes(aptnotes: List[dict]) -> List[dict]:
 async def get_aptnotes_with_file_urls(
     session: ClientSession, aptnotes: List[dict]
 ) -> List[dict]:
+    """Add file urls to aptnotes by scraping pdf splash for download link"""
     semaphore: BoundedSemaphore = BoundedSemaphore(25)
     coros: List[Coroutine] = [
         get_file_url(semaphore, session, aptnote) for aptnote in aptnotes
@@ -101,6 +106,7 @@ async def get_aptnotes_with_file_urls(
 async def get_file_url(
     semaphore: BoundedSemaphore, session: ClientSession, document: dict
 ) -> dict:
+    """Fetch splash page and find file url in it"""
     url: str = document.get("splash_url", "")
     splash_page: str = await fetch(semaphore, session, url, return_type="text")
     document["file_url"] = find_file_url(splash_page)
@@ -108,7 +114,7 @@ async def get_file_url(
 
 
 def find_file_url(page: str) -> str:
-    """Parse preview page for desired elements to build download URL"""
+    """Parse splash for desired elements to build download URL"""
     soup = BeautifulSoup(page, "lxml")
     scripts = soup.find("body").find_all("script")
     sections: List[str] = scripts[-1].contents[0].split(";")
@@ -120,6 +126,7 @@ def find_file_url(page: str) -> str:
 
 
 def build_file_url(shared_name: str, item_id: str) -> str:
+    """Build the correct file url from elemnts of the splash page"""
     url: str = "https://app.box.com/index.php"
     parameters: List[str] = [
         "?rm=box_download_shared_file",
@@ -136,6 +143,7 @@ def build_file_url(shared_name: str, item_id: str) -> str:
 async def fetch_and_enqueue_multiple(
     aptnotes: List[dict], session: ClientSession, condition: Condition, queue: Queue
 ) -> None:
+    """Fetch and enqueue multiple pdfs"""
     semaphore: BoundedSemaphore = BoundedSemaphore(25)
     coros: List[Coroutine] = [
         fetch_and_enqueue(aptnote, semaphore, session, condition, queue)
@@ -152,6 +160,7 @@ async def fetch_and_enqueue(
     condition: Condition,
     queue: Queue,
 ) -> None:
+    """Fetch and enqueue a single pdf"""
     url = aptnote["file_url"]
     buffer: bytes = await fetch(semaphore, session, url)
 
@@ -173,6 +182,7 @@ async def fetch_and_enqueue(
 
 
 def check_integrity(buffer: bytes, correct_hash: str) -> bool:
+    """Check the integrity of buffer with sha1 hash"""
     hash_check = hashlib.sha1()
     hash_check.update(buffer)
     result: bool = hash_check.hexdigest() == correct_hash
@@ -215,6 +225,7 @@ async def fetch(
     url: str,
     return_type: Literal["bytes", "json", "text"] = "bytes",
 ) -> Union[bytes, List[dict], str]:
+    """Fetch resource from url"""
     async with semaphore:
         async with session.get(url) as response:
             if response.status == 200:
