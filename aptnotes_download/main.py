@@ -30,7 +30,7 @@ def main(
         None, "--limit", "-l", help="Limit the number of downloads"
     ),
 ):
-    """Entry point to CLI"""
+    """Download and (optionally) parse APTNotes quickly and easily """
     datamaker = DataMaker(limit)
     if "sqlite" in form:
         path = ensure_correct_path(path)
