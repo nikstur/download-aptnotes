@@ -6,7 +6,9 @@ Download and (optionally) parse APTNotes quickly and easily.
 
 You need to have [Apache Tika](https://tika.apache.org/) installed.
 
-To make the data use the `aptnotes_download` command line tool. To download the documents as PDFs:
+To make the data use the `aptnotes_download` command line tool.
+
+To download the documents as PDFs in a created directory called `data/`:
 
 ````bash
 aptnotes_download.main pdfs
