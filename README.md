@@ -1,21 +1,27 @@
 # APTNotes Download
 
-Download and (optionally) parse APTNotes quickly and easily.
+Download and (optionally) parse [APTNotes](https://github.com/aptnotes/data) quickly and easily.
 
 ## Quick Start
 
 You need to have [Apache Tika](https://tika.apache.org/) installed.
 
-To make the data use the `aptnotes_download` command line tool.
-
-To download the documents as PDFs in a created directory called `data/`:
+Install `aptnotes-download` in a virtualenv. From the root of the cloned directory, call:
 
 ````bash
-aptnotes_download.main pdfs
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ````
 
-To download the documents, parse them, and then store them in a SQLite DB called `aptnotes.sqlite`:
+To download the documents as PDFs in a directory called  `files/`:
 
 ````bash
-aptnotes_download.main sqlite
+python -m aptnotes_download.main pdfs
+````
+
+To download the documents, parse them, and then store them in a SQLite file called `aptnotes.sqlite`:
+
+````bash
+python -m aptnotes_download.main sqlite
 ````
