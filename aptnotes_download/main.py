@@ -129,7 +129,3 @@ class DataMaker:
     def _join_all(self):
         for thread in self.threads:
             thread.join()
-
-
-if __name__ == "__main__":
-    app()
