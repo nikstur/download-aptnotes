@@ -1,32 +1,34 @@
 import asyncio
-import sqlite3
+from asyncio import Queue
 from pathlib import Path
-from queue import Queue
-from sqlite3 import Connection, Cursor, OperationalError
+from sqlite3 import OperationalError
 from threading import Condition, Event
-from typing import Tuple
 
 import aiofiles
+import aiosqlite
+import uvloop
 
 
-def save_to_files(
-    queue: Queue, condition: Condition, finish_event: Event, directory: Path
+def save(
+    form: str, queue: Queue, condition: Condition, finish_event: Event, path: Path
 ) -> None:
-    """Run save_and_write_to_files from CLI"""
-    directory.mkdir(parents=True, exist_ok=True)
-    asyncio.run(save_and_write_to_files(queue, condition, finish_event, directory))
+    uvloop.install()
+    if form == "sqlite":
+        asyncio.run(save_to_sqlite(queue, condition, finish_event, path))
+    if form == "pdf":
+        asyncio.run(save_to_files(queue, condition, finish_event, path))
 
 
-async def save_and_write_to_files(
+async def save_to_files(
     queue: Queue, condition: Condition, finish_event: Event, directory: Path,
 ) -> None:
-    """Continually read buffer from queue and write to file"""
+    directory.mkdir(parents=True, exist_ok=True)
     while not finish_event.is_set() or not queue.empty():
         with condition:
             while queue.empty():
                 condition.wait()
             try:
-                buffer, aptnote = queue.get()
+                buffer, aptnote = queue.get_nowait()
             finally:
                 queue.task_done()
         await write_file(buffer, directory, aptnote["filename"])
@@ -34,54 +36,48 @@ async def save_and_write_to_files(
 
 
 async def write_file(buffer: bytes, directory: Path, filename: str) -> None:
-    """Write single file to directory / filename"""
     path = directory / filename
     path = path.with_suffix(".pdf")
-    async with aiofiles.open(path, mode="wb") as f:
+    async with aiofiles.open(path, mode="wb") as f:  # type: ignore
         await f.write(buffer)
 
 
-def save_to_db(
+async def save_to_sqlite(
     queue: Queue, condition: Condition, finish_event: Event, path: Path
 ) -> None:
-    """Continaully read aptnote from queue and store it in DB"""
-    connection, cursor = setup_db_connection(path)
+    async with aiosqlite.connect(path) as db:
+        await db_init(db)
 
-    inserted_values = 0
-    while not finish_event.is_set() or not queue.empty():
-        with condition:
-            while queue.empty():
-                condition.wait()
-            try:
-                augmented_aptnote = queue.get()
-            except Exception as e:
-                print(e)
-            finally:
-                queue.task_done()
-        insert_values(cursor, augmented_aptnote)
-        connection.commit()
-        inserted_values += 1
+        inserted_values = 0
+        while not finish_event.is_set() or not queue.empty():
+            with condition:
+                while queue.empty():
+                    condition.wait()
+                try:
+                    augmented_aptnote = queue.get_nowait()
+                except Exception as e:
+                    print(e)
+                finally:
+                    queue.task_done()
+            await insert_values(db, augmented_aptnote)
+            await db.commit()
+            inserted_values += 1
 
-    connection.close()
     print(f"Downloaded and parsed {inserted_values} files.")
 
 
-def setup_db_connection(path: Path) -> Tuple[Connection, Cursor]:
-    """Setup DB connection"""
-    connection: Connection = sqlite3.connect(path)
-    cursor: Cursor = connection.cursor()
+async def db_init(db: aiosqlite.Connection) -> None:
     try:
-        cursor.execute("DROP TABLE aptnotes")
+        await db.execute("DROP TABLE aptnotes")
     except OperationalError:
         pass
-    create_table(cursor)
-    connection.commit()
-    return connection, cursor
+    await create_table(db)
+    await db.commit()
 
 
-def create_table(cursor: Cursor) -> None:
+async def create_table(db: aiosqlite.Connection) -> None:
     """Create aptnotes table in database"""
-    cursor.execute(
+    await db.execute(
         """
         CREATE TABLE aptnotes (
             id integer,
@@ -101,9 +97,9 @@ def create_table(cursor: Cursor) -> None:
     )
 
 
-def insert_values(cursor: Cursor, parameters: dict) -> None:
+async def insert_values(db: aiosqlite.Connection, parameters: dict) -> None:
     """Insert values of parameters into database"""
-    cursor.execute(
+    await db.execute(
         """
         INSERT INTO aptnotes VALUES (
             :unique_id,

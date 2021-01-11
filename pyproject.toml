@@ -8,14 +8,17 @@ repository = "https://github.com/nikstur/aptnotes-download"
 license = "GPL-3.0-or-later"
 
 [tool.poetry.scripts]
-aptnotes-download = "aptnotes_download.main:app"
+aptnotes-download = "aptnotes_download.cli:app"
 
 [tool.poetry.dependencies]
 python = "^3.8"
 aiofiles = "^0.6.0"
-aiohttp = "^3.7.3"
+aiohttp = {extras = ["speedups"], version = "^3.7.3"}
 beautifulsoup4 = {extras = ["lxml"], version = "^4.9.3"}
 typer = {extras = ["all"], version = "^0.3.2"}
+uvloop = "^0.14.0"
+janus = "^0.6.1"
+aiosqlite = "^0.16.0"
 
 tika = { version = "^1.24", optional = true }
 

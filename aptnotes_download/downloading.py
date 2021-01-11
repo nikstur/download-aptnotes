@@ -3,36 +3,41 @@ import hashlib
 import json
 import logging
 import time
-from asyncio import BoundedSemaphore
-from queue import Queue
+from asyncio import BoundedSemaphore, Queue
 from threading import Condition, Event
 from typing import Coroutine, List, Literal, Optional, Union, overload
 
 import aiohttp
+import uvloop
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
 
 def download(
-    queue: Queue, condition: Condition, finish_event: Event, limit: Optional[int]
+    queue: Queue,
+    condition: Condition,
+    finish_event: Event,
+    semaphore_value: int,
+    limit: Optional[int],
 ) -> None:
-    """Run download_and_enqueue from CLI"""
-    asyncio.run(download_and_enqueue(queue, condition, limit))
+    uvloop.install()
+    asyncio.run(download_and_enqueue(queue, condition, semaphore_value, limit))
     finish_event.set()
 
 
 async def download_and_enqueue(
-    queue: Queue, condition: Condition, limit: Optional[int]
+    queue: Queue, condition: Condition, semaphore_value: int, limit: Optional[int]
 ) -> None:
     """Download and enqueue all documents from source json"""
     source_json_url = (
         "https://raw.githubusercontent.com/aptnotes/data/master/APTnotes.json"
     )
 
-    limit_slice: slice = slice(limit)
+    limit_slice = slice(limit)
 
     async with aiohttp.ClientSession(headers={"Connection": "keep-alive"}) as session:
         start = time.time()
+        semaphore = BoundedSemaphore(semaphore_value)
 
         # Step 1: Get source json
         aptnotes = await get_aptnotes(session, source_json_url)
@@ -40,9 +45,9 @@ async def download_and_enqueue(
         logging.info(f"Time for reformatting aptnotes.json: {step1 - start}s")
         logging.info(f"Length of aptnotes: {len(aptnotes)}")
 
-        # Step 2: Get source json with file urls
-        aptnotes_with_file_urls = await get_aptnotes_with_file_urls(
-            session, aptnotes[limit_slice]
+        # Step 2: Add file urls to source json
+        aptnotes_with_file_urls = await add_file_urls_to_aptnotes(
+            session, semaphore, aptnotes[limit_slice]
         )
         step2 = time.time()
         logging.info(f"Time for retreiving file urls: {step2 - step1}s")
@@ -50,9 +55,9 @@ async def download_and_enqueue(
             f"Length of aptnotes_with_file_urls: {len(aptnotes_with_file_urls)}"
         )
 
-        # Step 3: Get files
+        # Step 3: Fetch and enqueue pdf buffer and metadata
         await fetch_and_enqueue_multiple(
-            aptnotes_with_file_urls, session, condition, queue
+            session, semaphore, aptnotes_with_file_urls, condition, queue
         )
         step3 = time.time()
         logging.info(f"Time for retrieving files: {step3 - step2}s.")
@@ -89,17 +94,12 @@ def rename_aptnotes(aptnotes: List[dict]) -> List[dict]:
 # Step 2: Get source json with file urls
 
 
-async def get_aptnotes_with_file_urls(
-    session: ClientSession, aptnotes: List[dict]
+async def add_file_urls_to_aptnotes(
+    session: ClientSession, semaphore: BoundedSemaphore, aptnotes: List[dict]
 ) -> List[dict]:
     """Add file urls to aptnotes by scraping pdf splash for download link"""
-    semaphore: BoundedSemaphore = BoundedSemaphore(25)
-    coros: List[Coroutine] = [
-        get_file_url(semaphore, session, aptnote) for aptnote in aptnotes
-    ]
-    aptnotes_with_file_urls: List[dict] = await asyncio.gather(
-        *coros, return_exceptions=True
-    )
+    coros = [get_file_url(semaphore, session, aptnote) for aptnote in aptnotes]
+    aptnotes_with_file_urls = await asyncio.gather(*coros, return_exceptions=True)
     return aptnotes_with_file_urls
 
 
@@ -118,33 +118,34 @@ def find_file_url(page: str) -> str:
     soup = BeautifulSoup(page, "lxml")
     scripts = soup.find("body").find_all("script")
     sections: List[str] = scripts[-1].contents[0].split(";")
-    app_api: dict = json.loads(sections[0].split("=")[1])[
-        "/app-api/enduserapp/shared-item"
-    ]
-    file_url: str = build_file_url(app_api["sharedName"], app_api["itemID"])
+    app_api = json.loads(sections[0].split("=")[1])["/app-api/enduserapp/shared-item"]
+    file_url = build_file_url(app_api["sharedName"], app_api["itemID"])
     return file_url
 
 
 def build_file_url(shared_name: str, item_id: str) -> str:
     """Build the correct file url from elemnts of the splash page"""
-    url: str = "https://app.box.com/index.php"
-    parameters: List[str] = [
-        "?rm=box_download_shared_file",
-        f"&shared_name={shared_name}",
-        f"&file_id=f_{item_id}",
-    ]
-    file_url: str = url + "".join(parameters)
+    url = "https://app.box.com/index.php"
+    parameters = (
+        "?rm=box_download_shared_file"
+        f"&shared_name={shared_name}"
+        f"&file_id=f_{item_id}"
+    )
+    file_url = url + parameters
     return file_url
 
 
-# Step 3: Get files
+# Step 3: Fetch and enqueue pdf buffer and metadata
 
 
 async def fetch_and_enqueue_multiple(
-    aptnotes: List[dict], session: ClientSession, condition: Condition, queue: Queue
+    session: ClientSession,
+    semaphore: BoundedSemaphore,
+    aptnotes: List[dict],
+    condition: Condition,
+    queue: Queue,
 ) -> None:
     """Fetch and enqueue multiple pdfs"""
-    semaphore: BoundedSemaphore = BoundedSemaphore(25)
     coros: List[Coroutine] = [
         fetch_and_enqueue(aptnote, semaphore, session, condition, queue)
         for aptnote in aptnotes
@@ -177,7 +178,7 @@ async def fetch_and_enqueue(
                 raise ValueError("File integrity could not be verified")
 
         with condition:
-            queue.put((buffer, aptnote))
+            await queue.put((buffer, aptnote))
             condition.notify()
 
 

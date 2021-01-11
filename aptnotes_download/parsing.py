@@ -1,8 +1,6 @@
 from queue import Queue
 from threading import Condition, Event
 
-from tika import parser
-
 
 def parse(
     input_queue: Queue,
@@ -12,7 +10,10 @@ def parse(
     output_queue_condition: Condition,
     output_finish_event: Event,
 ) -> None:
-    """Continually parse buffer from queue and enqueue it in second queue"""
+    try:
+        from tika import parser
+    except ImportError:
+        raise Exception("You need to install tika to parse the PDFs")
     while not input_finish_event.is_set() or not input_queue.empty():
         with input_queue_condition:
             while input_queue.empty():
@@ -21,14 +22,13 @@ def parse(
                 buffer, aptnote = input_queue.get()
             finally:
                 input_queue.task_done()
-        parse_and_enqueue(buffer, aptnote, output_queue, output_queue_condition)
+        parse_and_enqueue(buffer, aptnote, parser, output_queue, output_queue_condition)
     output_finish_event.set()
 
 
 def parse_and_enqueue(
-    buffer: bytes, aptnote: dict, queue: Queue, condition: Condition
+    buffer: bytes, aptnote: dict, parser, queue: Queue, condition: Condition
 ) -> None:
-    """Parse and enqueue single buffer"""
     parsed_buffer: dict = parser.from_buffer(buffer)
     augmented_aptnote: dict = augment_aptnote(aptnote, parsed_buffer)
     with condition:
