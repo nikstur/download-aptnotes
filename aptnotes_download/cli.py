@@ -11,8 +11,8 @@ app = typer.Typer()
 
 
 class Format(str, Enum):
-    pdf = "pdf"
     sqlite = "sqlite"
+    pdf = "pdf"
     json = "json"
     csv = "csv"
 

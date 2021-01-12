@@ -1,4 +1,7 @@
 import asyncio
+import csv
+import io
+import json
 from asyncio import Queue
 from pathlib import Path
 from sqlite3 import OperationalError
@@ -17,6 +20,56 @@ def save(
         asyncio.run(save_to_sqlite(queue, condition, finish_event, path))
     if form == "pdf":
         asyncio.run(save_to_files(queue, condition, finish_event, path))
+    if form == "json":
+        save_to_json(queue, condition, finish_event, path)
+    if form == "csv":
+        save_to_csv(queue, condition, finish_event, path)
+
+
+def save_to_csv(queue: Queue, condition: Condition, finish_event: Event, path: Path):
+    fieldnames = (
+        "unique_id",
+        "filename",
+        "title",
+        "source",
+        "splash_url",
+        "sha1",
+        "date",
+        "file_url",
+        "fulltext",
+        "creation_date",
+        "creator_tool",
+        "creator_title",
+    )
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    while not finish_event.is_set() or not queue.empty():
+        with condition:
+            while queue.empty():
+                condition.wait()
+            try:
+                augmented_aptnote = queue.get_nowait()
+            finally:
+                queue.task_done()
+        writer.writerow(augmented_aptnote)
+    with open(path, "wt") as f:
+        print(buffer.getvalue(), file=f)
+
+
+def save_to_json(queue: Queue, condition: Condition, finish_event: Event, path: Path):
+    aptnotes = []
+    while not finish_event.is_set() or not queue.empty():
+        with condition:
+            while queue.empty():
+                condition.wait()
+            try:
+                augmented_aptnote = queue.get_nowait()
+            finally:
+                queue.task_done()
+        aptnotes.append(augmented_aptnote)
+    with open(path, "wt") as f:
+        json.dump(aptnotes, f, sort_keys=True, indent=2)
 
 
 async def save_to_files(
