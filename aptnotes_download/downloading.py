@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import time
 from asyncio import BoundedSemaphore, Queue
 from threading import Condition, Event
 from typing import Coroutine, List, Literal, Optional, Union, overload
@@ -11,6 +10,8 @@ import aiohttp
 import uvloop
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
+
+from . import utils
 
 
 def download(
@@ -28,56 +29,36 @@ def download(
 async def download_and_enqueue(
     queue: Queue, condition: Condition, semaphore_value: int, limit: Optional[int]
 ) -> None:
-    """Download and enqueue all documents from source json"""
+    """Download source json and all documentsand enqueue all documents from """
     source_json_url = (
         "https://raw.githubusercontent.com/aptnotes/data/master/APTnotes.json"
     )
-
-    limit_slice = slice(limit)
-
     async with aiohttp.ClientSession(headers={"Connection": "keep-alive"}) as session:
-        start = time.time()
         semaphore = BoundedSemaphore(semaphore_value)
-
-        # Step 1: Get source json
-        aptnotes = await get_aptnotes(session, source_json_url)
-        step1 = time.time()
-        logging.info(f"Time for reformatting aptnotes.json: {step1 - start}s")
-        logging.info(f"Length of aptnotes: {len(aptnotes)}")
-
-        # Step 2: Add file urls to source json
-        aptnotes_with_file_urls = await add_file_urls_to_aptnotes(
-            session, semaphore, aptnotes[limit_slice]
+        source_json = await fetch_source_json(session, source_json_url)
+        source_json_with_file_urls = await add_file_urls_source_json(
+            session, semaphore, source_json[slice(limit)]
         )
-        step2 = time.time()
-        logging.info(f"Time for retreiving file urls: {step2 - step1}s")
-        logging.info(
-            f"Length of aptnotes_with_file_urls: {len(aptnotes_with_file_urls)}"
-        )
-
-        # Step 3: Fetch and enqueue pdf buffer and metadata
         await fetch_and_enqueue_multiple(
-            session, semaphore, aptnotes_with_file_urls, condition, queue
+            session, semaphore, source_json_with_file_urls, condition, queue
         )
-        step3 = time.time()
-        logging.info(f"Time for retrieving files: {step3 - step2}s.")
 
 
 # Step 1: Get source json
 
 
-async def get_aptnotes(session: ClientSession, url: str) -> List[dict]:
-    """Download aptnotes source json"""
+async def fetch_source_json(session: ClientSession, url: str) -> List[dict]:
     semaphore: BoundedSemaphore = BoundedSemaphore(1)
     data: List[dict] = await fetch(semaphore, session, url, return_type="json")
-    aptnotes: List[dict] = rename_aptnotes(data)
-    return aptnotes
+    source_json = rename_source_json_keys(data)
+    logging.info(f"Files available for download: {len(source_json)}")
+    return source_json
 
 
-def rename_aptnotes(aptnotes: List[dict]) -> List[dict]:
-    """Rename keys in aptnote and add unique id"""
-    renamed_aptnotes: List[dict] = []
-    for count, doc in enumerate(aptnotes):
+def rename_source_json_keys(source_json: List[dict]) -> List[dict]:
+    """Rename keys in source json and add unique id"""
+    renamed_source_json: List[dict] = []
+    for count, doc in enumerate(source_json):
         doc = {
             "unique_id": count,
             "filename": doc["Filename"],
@@ -87,14 +68,15 @@ def rename_aptnotes(aptnotes: List[dict]) -> List[dict]:
             "sha1": doc["SHA-1"],
             "date": doc["Date"],
         }
-        renamed_aptnotes.append(doc)
-    return renamed_aptnotes
+        renamed_source_json.append(doc)
+    return renamed_source_json
 
 
 # Step 2: Get source json with file urls
 
 
-async def add_file_urls_to_aptnotes(
+@utils.log_duration("Time for adding file URLs:")
+async def add_file_urls_source_json(
     session: ClientSession, semaphore: BoundedSemaphore, aptnotes: List[dict]
 ) -> List[dict]:
     """Add file urls to aptnotes by scraping pdf splash for download link"""
@@ -138,6 +120,7 @@ def build_file_url(shared_name: str, item_id: str) -> str:
 # Step 3: Fetch and enqueue pdf buffer and metadata
 
 
+@utils.log_duration("Time to fetch documents:")
 async def fetch_and_enqueue_multiple(
     session: ClientSession,
     semaphore: BoundedSemaphore,

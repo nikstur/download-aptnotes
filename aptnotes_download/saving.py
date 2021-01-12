@@ -2,6 +2,7 @@ import asyncio
 import csv
 import io
 import json
+import logging
 from asyncio import Queue
 from pathlib import Path
 from sqlite3 import OperationalError
@@ -10,6 +11,8 @@ from threading import Condition, Event
 import aiofiles
 import aiosqlite
 import uvloop
+
+logger = logging.getLogger(__name__)
 
 
 def save(
@@ -44,6 +47,7 @@ def save_to_csv(queue: Queue, condition: Condition, finish_event: Event, path: P
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
     writer.writeheader()
+    inserted_values = 0
     while not finish_event.is_set() or not queue.empty():
         with condition:
             while queue.empty():
@@ -53,8 +57,13 @@ def save_to_csv(queue: Queue, condition: Condition, finish_event: Event, path: P
             finally:
                 queue.task_done()
         writer.writerow(augmented_aptnote)
+        inserted_values += 1
     with open(path, "wt") as f:
         print(buffer.getvalue(), file=f)
+    relative_path = path.relative_to(Path.cwd())
+    logger.info(
+        f"Downloaded, parsed, and saved {inserted_values} documents in {relative_path}"
+    )
 
 
 def save_to_json(queue: Queue, condition: Condition, finish_event: Event, path: Path):
@@ -70,6 +79,10 @@ def save_to_json(queue: Queue, condition: Condition, finish_event: Event, path: 
         aptnotes.append(augmented_aptnote)
     with open(path, "wt") as f:
         json.dump(aptnotes, f, sort_keys=True, indent=2)
+    relative_path = path.relative_to(Path.cwd())
+    logger.info(
+        f"Downloaded, parsed, and saved {len(aptnotes)} documents in {relative_path}"
+    )
 
 
 async def save_to_files(
@@ -85,7 +98,9 @@ async def save_to_files(
             finally:
                 queue.task_done()
         await write_file(buffer, directory, aptnote["filename"])
-    print(f"No. of downloaded files {len(list(directory.iterdir()))}")
+    relative_path = directory.relative_to(Path.cwd())
+    no_of_files = len(list(directory.iterdir()))
+    logger.info(f"Downloaded and saved {no_of_files} files in {relative_path}")
 
 
 async def write_file(buffer: bytes, directory: Path, filename: str) -> None:
@@ -109,14 +124,17 @@ async def save_to_sqlite(
                 try:
                     augmented_aptnote = queue.get_nowait()
                 except Exception as e:
-                    print(e)
+                    logger.error(e)
                 finally:
                     queue.task_done()
             await insert_values(db, augmented_aptnote)
             await db.commit()
             inserted_values += 1
 
-    print(f"Downloaded and parsed {inserted_values} files.")
+    relative_path = path.relative_to(Path.cwd())
+    logger.info(
+        f"Downloaded, parsed, and saved {inserted_values} documents in {relative_path}"
+    )
 
 
 async def db_init(db: aiosqlite.Connection) -> None:

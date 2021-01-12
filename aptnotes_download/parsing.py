@@ -13,7 +13,7 @@ def parse(
     try:
         from tika import parser
     except ImportError:
-        raise Exception("You need to install tika to parse the PDFs")
+        raise Exception("You need to install Java 7+ to enable parsing the PDFs")
     while not input_finish_event.is_set() or not input_queue.empty():
         with input_queue_condition:
             while input_queue.empty():

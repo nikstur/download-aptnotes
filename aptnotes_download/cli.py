@@ -1,11 +1,17 @@
 import asyncio
+import logging
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 import typer
 
+from . import utils
 from .main import APTNotesDownload
+
+logging.basicConfig(
+    level=logging.INFO, format="%(message)s",
+)
 
 app = typer.Typer()
 
@@ -17,6 +23,7 @@ class Format(str, Enum):
     csv = "csv"
 
 
+@utils.log_duration("Total time:")
 @app.command()
 def main(
     form: Format = typer.Option(..., "--format", "-f", help="Output format"),
