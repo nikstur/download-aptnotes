@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "aptnotes-download"
 version = "0.1.0"
-description = "Download and (optionally) parse APTNotes quickly and easily."
+description = "Download and (optionally) parse APTNotes quickly and easily"
 authors = ["nikstur"]
 readme = "README.md"
 repository = "https://github.com/nikstur/aptnotes-download"

@@ -19,18 +19,18 @@ class Format(str, Enum):
 
 @app.command()
 def main(
-    form: Format = typer.Option(Format.sqlite, "--format", "-f", help="Output format"),
+    form: Format = typer.Option(..., "--format", "-f", help="Output format"),
     path: Path = typer.Option(
-        "aptnotes", "--output", "-o", help="Output path of file or directory"
+        ..., "--output", "-o", help="Output path of file or directory"
     ),
     limit: Optional[int] = typer.Option(
-        None, "--limit", "-l", help="Limit of files to download"
+        None, "--limit", "-l", help="Number of files to download"
     ),
     parallel: int = typer.Option(
-        10, "--parallel", "-p", help="Number of files to download in parallell"
+        10, "--parallel", "-p", help="Number of parallell downloads"
     ),
 ) -> None:
-    """Download and (optionally) parse APTNotes quickly and easily """
+    """Download and (optionally) parse APTNotes quickly and easily"""
     asyncio.run(async_main(form, path, limit, parallel))
 
 
