@@ -1,3 +1,4 @@
+import logging
 from queue import Queue
 from threading import Condition, Event
 
@@ -14,6 +15,8 @@ def parse(
         from tika import parser
     except ImportError:
         raise Exception("You need to install Java 7+ to enable parsing the PDFs")
+    else:
+        logging.getLogger("tika.tika").setLevel("CRITICAL")
     while not input_finish_event.is_set() or not input_queue.empty():
         with input_queue_condition:
             while input_queue.empty():

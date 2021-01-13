@@ -7,7 +7,7 @@ import janus
 from . import downloading, parsing, saving
 
 
-class APTNotesDownload:
+class DownloadAPTNotes:
     def __init__(self) -> None:
         self.threads: List[threading.Thread] = []
 

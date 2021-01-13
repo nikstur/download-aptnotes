@@ -7,11 +7,9 @@ from typing import Optional
 import typer
 
 from . import utils
-from .main import APTNotesDownload
+from .main import DownloadAPTNotes
 
-logging.basicConfig(
-    level=logging.INFO, format="%(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 app = typer.Typer()
 
@@ -23,7 +21,6 @@ class Format(str, Enum):
     csv = "csv"
 
 
-@utils.log_duration("Total time:")
 @app.command()
 def main(
     form: Format = typer.Option(..., "--format", "-f", help="Output format"),
@@ -41,15 +38,16 @@ def main(
     asyncio.run(async_main(form, path, limit, parallel))
 
 
+@utils.log_duration("DEBUG", "Total time:")
 async def async_main(form: Format, path: Path, limit: Optional[int], parallel: int):
-    aptnotesdownload = APTNotesDownload()
+    aptnotesdownload = DownloadAPTNotes()
     await aptnotesdownload.add_downloading(parallel, limit)
     await aptnotesdownload.add_saving(form.value, ensure_path(path))
     aptnotesdownload.start()
 
 
 def ensure_path(path: Path) -> Path:
-    """Ensure that relative and absolute paths are treating accordingly"""
+    """Ensure that relative and absolute paths are treated accordingly"""
     if path.is_absolute():
         return path
     else:

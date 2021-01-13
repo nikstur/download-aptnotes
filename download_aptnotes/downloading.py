@@ -51,7 +51,7 @@ async def fetch_source_json(session: ClientSession, url: str) -> List[dict]:
     semaphore: BoundedSemaphore = BoundedSemaphore(1)
     data: List[dict] = await fetch(semaphore, session, url, return_type="json")
     source_json = rename_source_json_keys(data)
-    logging.info(f"Files available for download: {len(source_json)}")
+    logging.debug(f"Files available for download: {len(source_json)}")
     return source_json
 
 
@@ -75,7 +75,7 @@ def rename_source_json_keys(source_json: List[dict]) -> List[dict]:
 # Step 2: Get source json with file urls
 
 
-@utils.log_duration("Time for adding file URLs:")
+@utils.log_duration("DEBUG", "Time for adding file URLs:")
 async def add_file_urls_source_json(
     session: ClientSession, semaphore: BoundedSemaphore, aptnotes: List[dict]
 ) -> List[dict]:
@@ -120,7 +120,7 @@ def build_file_url(shared_name: str, item_id: str) -> str:
 # Step 3: Fetch and enqueue pdf buffer and metadata
 
 
-@utils.log_duration("Time to fetch documents:")
+@utils.log_duration("DEBUG", "Time to fetch documents:")
 async def fetch_and_enqueue_multiple(
     session: ClientSession,
     semaphore: BoundedSemaphore,

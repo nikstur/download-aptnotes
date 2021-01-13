@@ -5,7 +5,7 @@ Download and (optionally) parse [APTNotes](https://github.com/aptnotes/data) qui
 ## Installation
 
 ```bash
-pip install aptnotes_download
+pip install download-aptnotes
 ```
 
 To enable parsing the downloaded PDFs you need to install the extra `tika`. This
@@ -14,13 +14,13 @@ that you have an adequate version of Java installed before you try to install it
 Without this extra, the only output format available is `pdf`.
 
 ```bash
-pip install aptnotes_download[tika]
+pip install download-aptnotes[tika]
 ```
 
 ## Usage
 
 ```txt
-Usage: aptnotes-download [OPTIONS]
+Usage: download-aptnotes [OPTIONS]
 
   Download and (optionally) parse APTNotes quickly and easily
 

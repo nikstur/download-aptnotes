@@ -62,7 +62,7 @@ def save_to_csv(queue: Queue, condition: Condition, finish_event: Event, path: P
         print(buffer.getvalue(), file=f)
     relative_path = path.relative_to(Path.cwd())
     logger.info(
-        f"Downloaded, parsed, and saved {inserted_values} documents in {relative_path}"
+        f"Downloaded, parsed, and saved {inserted_values} document(s) in {relative_path}"
     )
 
 
@@ -81,7 +81,7 @@ def save_to_json(queue: Queue, condition: Condition, finish_event: Event, path: 
         json.dump(aptnotes, f, sort_keys=True, indent=2)
     relative_path = path.relative_to(Path.cwd())
     logger.info(
-        f"Downloaded, parsed, and saved {len(aptnotes)} documents in {relative_path}"
+        f"Downloaded, parsed, and saved {len(aptnotes)} document(s) in {relative_path}"
     )
 
 
@@ -100,7 +100,7 @@ async def save_to_files(
         await write_file(buffer, directory, aptnote["filename"])
     relative_path = directory.relative_to(Path.cwd())
     no_of_files = len(list(directory.iterdir()))
-    logger.info(f"Downloaded and saved {no_of_files} files in {relative_path}")
+    logger.info(f"Downloaded and saved {no_of_files} file(s) in {relative_path}")
 
 
 async def write_file(buffer: bytes, directory: Path, filename: str) -> None:
@@ -133,7 +133,7 @@ async def save_to_sqlite(
 
     relative_path = path.relative_to(Path.cwd())
     logger.info(
-        f"Downloaded, parsed, and saved {inserted_values} documents in {relative_path}"
+        f"Downloaded, parsed, and saved {inserted_values} document(s) in {relative_path}"
     )
 
 
