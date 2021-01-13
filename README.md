@@ -1,4 +1,4 @@
-# APTNotes Download
+# Download APTNotes
 
 Download and (optionally) parse [APTNotes](https://github.com/aptnotes/data) quickly and easily
 
