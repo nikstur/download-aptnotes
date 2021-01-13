@@ -81,7 +81,7 @@ class DownloadAPTNotes:
         )
 
     def _add_thread(self, func: Callable, *args) -> None:
-        thread = threading.Thread(target=func, args=args,)
+        thread = threading.Thread(target=func, args=args)
         self.threads.append(thread)
 
     def start(self) -> None:

@@ -86,7 +86,7 @@ def save_to_json(queue: Queue, condition: Condition, finish_event: Event, path: 
 
 
 async def save_to_files(
-    queue: Queue, condition: Condition, finish_event: Event, directory: Path,
+    queue: Queue, condition: Condition, finish_event: Event, directory: Path
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     while not finish_event.is_set() or not queue.empty():
