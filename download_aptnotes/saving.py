@@ -5,7 +5,6 @@ import json
 import logging
 from asyncio import Queue
 from pathlib import Path
-from sqlite3 import OperationalError
 from threading import Condition, Event
 
 import aiofiles
@@ -138,10 +137,7 @@ async def save_to_sqlite(
 
 
 async def db_init(db: aiosqlite.Connection) -> None:
-    try:
-        await db.execute("DROP TABLE aptnotes")
-    except OperationalError:
-        pass
+    await db.execute("DROP TABLE IF EXISTS aptnotes")
     await create_table(db)
     await db.commit()
 
