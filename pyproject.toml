@@ -6,6 +6,7 @@ authors = ["nikstur"]
 readme = "README.md"
 repository = "https://github.com/nikstur/download-aptnotes"
 license = "GPL-3.0-or-later"
+keywords = ["aptnotes", "apt", "infosec", "data"]
 
 [tool.poetry.scripts]
 download-aptnotes = "download_aptnotes.cli:app"
