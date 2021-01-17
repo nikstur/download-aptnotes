@@ -8,6 +8,7 @@ import typer
 
 from . import utils
 from .main import DownloadAPTNotes
+from .parsing import OptionalDepedencyMissing
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -42,7 +43,13 @@ def main(
 async def async_main(form: Format, path: Path, limit: Optional[int], parallel: int):
     aptnotesdownload = DownloadAPTNotes()
     await aptnotesdownload.add_downloading(parallel, limit)
-    await aptnotesdownload.add_saving(form.value, ensure_path(path))
+    try:
+        await aptnotesdownload.add_saving(form.value, ensure_path(path))
+    except OptionalDepedencyMissing:
+        typer.echo(
+            "Optional dependency tika is not installed. Only format 'pdf' is available."
+        )
+        raise typer.Exit()
     aptnotesdownload.start()
 
 

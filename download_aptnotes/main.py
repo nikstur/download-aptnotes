@@ -34,6 +34,8 @@ class DownloadAPTNotes:
             await self._add_parsed_doc_saving_sync(form, path)
 
     async def _add_parsing(self) -> None:
+        if not parsing.tika_installed:
+            raise parsing.OptionalDepedencyMissing("tika")
         self.parsed_doc_queue: janus.Queue = janus.Queue()
         self.parsed_doc_queue_condition = threading.Condition()
         self.finished_parsing_event = threading.Event()
